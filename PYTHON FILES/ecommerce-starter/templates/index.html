@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Isho Macarvelle Digital Enterprise</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h1>Isho Macarvelle Digital Enterprise</h1>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div id="cart-badge" class="cart-badge">Cart 0</div>
+          <div id="user-menu">
+            <button id="login-btn" onclick="showLoginForm()" style="background:#0066CC;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Login</button>
+          </div>
+        </div>
+      </div>
+    </header>
+    <div id="toast-container" class="toast-container"></div>
+    <main>
+      <section>
+        <h2>Products</h2>
+        <div class="search-bar">
+          <input id="search-input" type="text" placeholder="Search products...">
+          <select id="category-select">
+            <option value="">All categories</option>
+          </select>
+        </div>
+        <div id="product-list" class="product-grid"></div>
+      </section>
+      <aside>
+        <div class="sidebar-section">
+          <h2>Cart</h2>
+          <div id="cart-list"></div>
+          <div id="cart-total"></div>
+        </div>
+        <div class="sidebar-section">
+          <h2>Order History</h2>
+          <div id="orders-list"></div>
+        </div>
+        <div class="sidebar-section">
+          <h2>Persistence</h2>
+          <div id="persistence-status">
+            <p>Loading persisted state...</p>
+          </div>
+          <input id="admin-seed-key" type="text" placeholder="Admin key (optional)" style="width:100%;margin:8px 0;padding:8px;border:1px solid #ddd;border-radius:4px;">
+          <button id="seed-button" onclick="seedDatabase()" style="width:100%;background:#0066CC;color:white;padding:8px;border:none;border-radius:4px;cursor:pointer;">Seed sample data</button>
+          <button id="admin-seed-button" onclick="adminSeedDatabase()" style="width:100%;margin-top:8px;background:#4B0082;color:white;padding:8px;border:none;border-radius:4px;cursor:pointer;">Admin seed</button>
+          <button id="admin-panel-button" onclick="showAdminPanel()" style="width:100%;margin-top:8px;background:#d9822b;color:white;padding:8px;border:none;border-radius:4px;cursor:pointer;">Admin panel</button>
+          <button id="analytics-button" onclick="showAnalyticsDashboard()" style="width:100%;margin-top:8px;background:#16a34a;color:white;padding:8px;border:none;border-radius:4px;cursor:pointer;">Analytics</button>
+        </div>
+      </aside>
+    </main>
+
+    <div id="auth-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close" onclick="closeAuthModal()">×</button>
+        <h2 id="auth-title">Login</h2>
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)" style="display:flex;flex-direction:column;gap:12px;">
+          <input type="text" id="auth-name" placeholder="Name" style="padding:8px;border:1px solid #ddd;border-radius:4px;display:none;">
+          <input type="email" id="auth-email" placeholder="Email" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+          <input type="password" id="auth-password" placeholder="Password" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+          <button type="submit" id="auth-submit-btn" style="padding:10px;background:#1B7C2C;color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
+        </form>
+        <p id="auth-toggle" style="text-align:center;margin-top:12px;">
+          Don't have an account? <a href="#" onclick="toggleAuthMode(event)" style="color:#0066CC;text-decoration:none;">Sign up</a>
+        </p>
+      </div>
+    </div>
+
+    <div id="product-modal" class="product-modal hidden">
+      <div class="product-modal-content">
+        <button class="modal-close" onclick="hideProductDetails()">×</button>
+        <img id="modal-image" src="" alt="Product image">
+        <h3 id="modal-title"></h3>
+        <p id="modal-category"></p>
+        <p id="modal-description"></p>
+        <p id="modal-price"></p>
+        <p id="modal-stock"></p>
+        <p id="modal-rating"></p>
+        <div class="review-sort-row">
+          <label for="review-sort">Sort reviews:</label>
+          <select id="review-sort" onchange="setReviewSort(event)">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="highest">Highest rating</option>
+          </select>
+        </div>
+        <div id="review-list"></div>
+        <div id="review-form" class="review-form hidden">
+          <h4>Leave a review</h4>
+          <label for="review-rating">Rating:</label>
+          <select id="review-rating" required>
+            <option value="5">5 - Excellent</option>
+            <option value="4">4 - Very Good</option>
+            <option value="3">3 - Good</option>
+            <option value="2">2 - Fair</option>
+            <option value="1">1 - Poor</option>
+          </select>
+          <label for="review-comment">Comment:</label>
+          <textarea id="review-comment" rows="3" placeholder="Write your review..." style="padding:8px;border:1px solid #ddd;border-radius:4px;"></textarea>
+          <button type="button" onclick="submitReview()" style="margin-top:12px;padding:10px;background:#1B7C2C;color:white;border:none;border-radius:4px;cursor:pointer;">Submit review</button>
+        </div>
+        <p id="review-login-hint" class="review-login-hint">Login to leave a review.</p>
+        <button id="modal-add-button" onclick="modalAddToCart()">Add to cart</button>
+      </div>
+    </div>
+
+    <div id="order-modal" class="product-modal hidden">
+      <div class="product-modal-content">
+        <button class="modal-close" onclick="hideOrderDetails()">×</button>
+        <h3>Order details</h3>
+        <div id="order-modal-content">
+          <div id="order-details-info"></div>
+          <div id="order-details-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-modal" class="product-modal hidden">
+      <div class="product-modal-content admin-modal-content">
+        <button class="modal-close" onclick="closeAdminPanel()">×</button>
+        <h2>Admin Product Management</h2>
+        <div class="admin-tabs">
+          <button class="admin-tab-btn active" onclick="switchAdminTab('list')">Products</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('create')">Create new</button>
+        </div>
+        
+        <div id="admin-list-tab" class="admin-tab active">
+          <table id="admin-products-table" class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Inventory</th>
+                <th>Category</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-products-body">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="admin-create-tab" class="admin-tab hidden">
+          <form id="admin-product-form" onsubmit="adminSaveProduct(event)" style="display:flex;flex-direction:column;gap:12px;">
+            <input type="hidden" id="admin-product-id">
+            <input type="text" id="admin-product-name" placeholder="Product name" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            <textarea id="admin-product-description" placeholder="Product description" required rows="3" style="padding:8px;border:1px solid #ddd;border-radius:4px;"></textarea>
+            <input type="number" id="admin-product-price" placeholder="Price" step="0.01" min="0" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            <input type="number" id="admin-product-inventory" placeholder="Inventory" min="0" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            <input type="text" id="admin-product-category" placeholder="Category" style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            <input type="url" id="admin-product-image" placeholder="Image URL" style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            <button type="submit" id="admin-product-submit" style="padding:10px;background:#1B7C2C;color:white;border:none;border-radius:4px;cursor:pointer;">Create product</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="checkout-modal" class="product-modal hidden">
+      <div class="product-modal-content checkout-modal-content">
+        <button class="modal-close" onclick="closeCheckoutModal()">×</button>
+        <h2>Checkout</h2>
+        <form id="checkout-form" onsubmit="processCheckout(event)">
+          <div class="checkout-section">
+            <h3>Shipping Address</h3>
+            <input type="text" id="checkout-name" placeholder="Full name" required style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;box-sizing:border-box;">
+            <input type="email" id="checkout-email" placeholder="Email" required style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;box-sizing:border-box;">
+            <input type="text" id="checkout-address" placeholder="Street address" required style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;box-sizing:border-box;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <input type="text" id="checkout-city" placeholder="City" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+              <input type="text" id="checkout-postal" placeholder="Postal code" required style="padding:8px;border:1px solid #ddd;border-radius:4px;">
+            </div>
+            <input type="text" id="checkout-country" placeholder="Country" required style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;box-sizing:border-box;">
+          </div>
+
+          <div class="checkout-section">
+            <h3>Shipping Method</h3>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="shipping-method" value="flat" checked onchange="updateShippingCost()"> Flat rate ($9.99)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="shipping-method" value="zone" onchange="updateShippingCost()"> Zone-based (varies by country)
+            </label>
+            <div id="shipping-cost-display" style="padding:8px;background:#f5f5f5;border-radius:4px;margin-top:8px;">Shipping: Calculating...</div>
+          </div>
+
+          <div class="checkout-section">
+            <h3>Order Summary</h3>
+            <div id="checkout-summary" style="padding:8px;background:#f9f9f9;border-radius:4px;margin-bottom:12px;"></div>
+          </div>
+
+          <div class="checkout-section">
+            <h3>Payment</h3>
+            <div id="card-element" style="padding:10px;border:1px solid #ddd;border-radius:4px;margin-bottom:12px;background:white;"></div>
+            <div id="card-errors" style="color:#c0392b;margin-bottom:12px;"></div>
+            <button type="submit" id="checkout-submit-btn" style="width:100%;padding:12px;background:#1B7C2C;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Place order</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="analytics-modal" class="product-modal hidden">
+      <div class="product-modal-content analytics-modal-content">
+        <button class="modal-close" onclick="closeAnalyticsDashboard()">×</button>
+        <h2>Analytics Dashboard</h2>
+        <div class="analytics-tabs">
+          <button class="analytics-tab-btn active" onclick="switchAnalyticsTab('overview')">Overview</button>
+          <button class="analytics-tab-btn" onclick="switchAnalyticsTab('products')">Products</button>
+          <button class="analytics-tab-btn" onclick="switchAnalyticsTab('customers')">Customers</button>
+          <button class="analytics-tab-btn" onclick="switchAnalyticsTab('revenue')">Revenue</button>
+        </div>
+
+        <div id="overview-tab" class="analytics-tab active">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Total Orders</div>
+              <div class="metric-value" id="metric-orders">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Total Revenue</div>
+              <div class="metric-value" id="metric-revenue">$0.00</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Avg Order Value</div>
+              <div class="metric-value" id="metric-avg-order">$0.00</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Total Customers</div>
+              <div class="metric-value" id="metric-customers">0</div>
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <h3>Revenue Trend</h3>
+            <canvas id="revenue-chart" height="100"></canvas>
+          </div>
+        </div>
+
+        <div id="products-tab" class="analytics-tab hidden">
+          <h3>Top Products by Revenue</h3>
+          <table class="analytics-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Units Sold</th>
+                <th>Revenue</th>
+                <th>Inventory</th>
+              </tr>
+            </thead>
+            <tbody id="products-table-body">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="customers-tab" class="analytics-tab hidden">
+          <h3>Customer Metrics</h3>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Total Customers</div>
+              <div class="metric-value" id="cust-total">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Repeat Customers</div>
+              <div class="metric-value" id="cust-repeat">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Repeat Rate</div>
+              <div class="metric-value" id="cust-repeat-rate">0%</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Avg Orders/Customer</div>
+              <div class="metric-value" id="cust-avg-orders">0</div>
+            </div>
+          </div>
+          <h3>Top Customers by Spending</h3>
+          <table class="analytics-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Email</th>
+                <th>Orders</th>
+                <th>Total Spent</th>
+              </tr>
+            </thead>
+            <tbody id="customers-table-body">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="revenue-tab" class="analytics-tab hidden">
+          <h3>Revenue Overview</h3>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Total Revenue</div>
+              <div class="metric-value" id="rev-total">$0.00</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Total Orders</div>
+              <div class="metric-value" id="rev-orders">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Avg Order Value</div>
+              <div class="metric-value" id="rev-aov">$0.00</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Avg Items/Order</div>
+              <div class="metric-value" id="rev-avg-items">0</div>
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <h3>Daily Revenue</h3>
+            <canvas id="daily-revenue-chart" height="100"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
